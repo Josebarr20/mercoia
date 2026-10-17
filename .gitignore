@@ -1,0 +1,23 @@
+# --- Datos: viven en Google Drive (ver README, "Estructura esperada del dataset") ---
+Algorithm/Our_dataset_sin_segmen/
+Algorithm/data/
+Algorithm/data_etq/
+dataset_segm/
+Algorithm/codes/Dataset_codes/data/*
+!Algorithm/codes/Dataset_codes/data/etiquetas.csv
+!Algorithm/codes/Dataset_codes/data/relacion_drive.csv
+!Algorithm/codes/Dataset_codes/data/revision_cambios.csv
+
+# --- Pesos: solo se versionan los dos modelos recomendados de inferencia/pesos/ ---
+*.pt
+*.pth
+!inferencia/pesos/*.pth
+sota_networks/WEIGHTS/
+sota_networks/reporte/
+
+# --- Salidas y cachés ---
+wandb/
+__pycache__/
+*.pyc
+*.log
+.ipynb_checkpoints/
