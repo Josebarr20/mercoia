@@ -26,7 +26,7 @@ FRUTAS = {"Mora": ("Moras", "Moras", "mora_", "mora_"), "Pina": ("Pinas", "Pinas
           "Banano": ("bananos", "Bananos", "banano_", "banano_")}
 NOMBRE = {"sana": "Sana", "sano": "Sano", "racimo_sano": "Sano", "antracnosis": "Antracnosis", "moho_gris": "Moho gris",
           "botritis": "Botritis", "enferma": "Enferma", "dano_externo": "Daño externo", "corte_interno": "Corte interno", "descartado": "Descartado", "fusarium": "Fusarium", "fusariosis": "Fusariosis", "pudricion": "Pudrición",
-          "phytophthora": "Phytophthora", "phytopthora": "Phytophthora", "afectacion_externa": "Afectación externa"}
+          "phytophthora": "Phytophthora", "phytopthora": "Phytophthora", "afectacion_externa": "Afectación externa", "trips": "Trips"}
 AZUL, GRIS = PatternFill("solid", fgColor="1F4E79"), PatternFill("solid", fgColor="F2F2F2")
 
 

@@ -6,6 +6,9 @@ Fecha de cada foto, por prioridad:
   2. Nombre de sesión viejo: capN_DDmes -> día/mes; Agos_10 -> 10/08; WhatsApp Image 2026-MM-DD -> fecha.
   3. Sin fecha (Antracnosis_N, moras_enfermas, mora1, pina1, fusariosis, pineapple_disease…): NO se renombran.
 Numeración: por (fruta, fecha), consecutiva desde 1 en orden cronológico (Drive) o alfabético.
+Recortes: además se normaliza el sufijo a _NN: _maskK -> _{K-1:02d}; recorte nombrado igual que su foto -> _00;
+el motivo del filtro (_tamano, _forma…) solo se conserva en descartes/. Si el nombre nuevo ya existe se usa el
+siguiente índice libre, y los CSV reciben exactamente ese nombre final.
 
 Uso:  python renombrar_fotos.py --dry      (muestra el plan)
       python renombrar_fotos.py            (aplica y escribe data/renombrado_<fecha>.csv con antiguo -> nuevo)
@@ -98,7 +101,8 @@ def plan():
 
 def carpetas_derivadas():
   c = [SEGM / seg for _, seg in FRUTAS.values()] + [SEGM / "descartes" / seg for _, seg in FRUTAS.values()] \
-    + [d for d in DATA.iterdir() if d.is_dir() and d.name.split("_")[0] in ("mora", "pina", "banano")] \
+    + [d for base in (DATA, DATA.with_name("data_etq")) if base.exists() for d in base.iterdir()
+       if d.is_dir() and d.name.split("_")[0] in ("mora", "pina", "banano")] \
     + [CRUDAS / "Pinas" / "segm" / "Selec", CRUDAS / "Pinas" / "segm" / "Detec"]
   return [d for d in c if d.exists()]
 
@@ -107,8 +111,9 @@ def fruta_de_carpeta(d):
   return next((s for _, s in FRUTAS.values() if s in d.parts), None) or {"mora": "Moras", "pina": "Pinas", "banano": "Bananos"}[d.name.split("_")[0]]
 
 
-def nuevo_nombre(seg, nombre, mapa, drive_stems):
-  """Nombre nuevo de un archivo derivado de una foto (recorte, descarte, copia aug), o None si no cambia."""
+def nuevo_nombre(seg, nombre, mapa, drive_stems, recorte=True, descarte=False):
+  """Nombre nuevo de un archivo derivado de una foto (recorte, descarte, copia aug), o None si su foto no tiene fecha.
+  recorte=False para rutas de fotos crudas (relacion_drive.csv): solo cambia la base, nunca el sufijo."""
   stem, ext = Path(nombre).stem, Path(nombre).suffix
   aug = re.match(r"^(aug_\d{4}_)(.*)$", stem); pre = ""
   if aug: pre, stem = aug[1], aug[2]
@@ -116,7 +121,21 @@ def nuevo_nombre(seg, nombre, mapa, drive_stems):
   else: base, suf = SUFIJO.match(stem).groups(); suf = suf or ""
   if (seg, base) not in mapa and base in drive_stems: base = drive_stems[base]
   if (seg, base) not in mapa: return None
+  if recorte:
+    m = re.fullmatch(r"_mask(\d+)", suf)
+    if not suf: suf = "_00"
+    elif m: suf = f"_{int(m[1]) - 1:02d}"
+    elif not descarte: suf = re.sub(r"_[a-z]+$", "", suf)
   return f"{pre}{mapa[(seg, base)]}{suf}{ext}"
+
+
+def libre(nombre, ocupados):
+  """Siguiente índice _NN libre para un recorte cuyo nombre ya está tomado (conserva prefijo aug_ y motivo)."""
+  stem, ext = Path(nombre).stem, Path(nombre).suffix
+  m = re.match(r"^(.*)_(\d{2,})(_[a-z]+)?$", stem)
+  k = int(m[2]) + 1
+  while f"{m[1]}_{k:02d}{m[3] or ''}{ext}" in ocupados: k += 1
+  return f"{m[1]}_{k:02d}{m[3] or ''}{ext}"
 
 
 def main(args):
@@ -134,34 +153,49 @@ def main(args):
   print("  ejemplos:", *[f"{a} -> {b}" for a, b in ejemplos], sep="\n    ")
 
   # archivos derivados
-  derivados, huerfanos = [], Counter()
+  # final: (carpeta de fruta, nombre viejo) -> nombre definitivo en dataset_segm, con los choques ya resueltos;
+  # las copias en Algorithm/data* y los CSV usan este mismo nombre.
+  derivados, huerfanos, final = [], Counter(), {}
   for d in carpetas_derivadas():
-    seg = fruta_de_carpeta(d)
-    for p in d.iterdir():
-      if p.suffix.lower() not in IMG: continue
-      nn = nuevo_nombre(seg, p.name, mapa, drive_stems)
-      if nn and nn != p.name: derivados.append((p, p.with_name(nn)))
-      elif nn is None: huerfanos[d.name] += 1
+    seg, desc = fruta_de_carpeta(d), "descartes" in d.parts
+    nombres = sorted(p.name for p in d.iterdir() if p.suffix.lower() in IMG)
+    plan_d = {}
+    for n in nombres:
+      nn = nuevo_nombre(seg, n, mapa, drive_stems, descarte=desc)
+      if nn is None: huerfanos[d.name] += 1
+      elif nn != n: plan_d[n] = nn
+    ocupados = set(nombres) - set(plan_d)          # los que se quedan con su nombre + destinos ya asignados
+    for n, nn in plan_d.items():
+      aug = re.match(r"^(aug_\d{4}_)(.*)$", n); pre, sin = (aug[1], aug[2]) if aug else ("", n)
+      if not desc and (seg, sin) in final: nn = pre + final[(seg, sin)]
+      if nn in ocupados:
+        print(f"  choque: {n} -> {nn} ya existe", end=""); nn = libre(nn, ocupados); print(f"; se usa {nn}")
+      ocupados.add(nn)
+      if d.parent == SEGM: final[(seg, n)] = nn
+      derivados.append((d / n, d / nn))
   print(f"\narchivos derivados a renombrar: {len(derivados)} | sin foto de origen con fecha (se dejan): {dict(huerfanos)}")
+  print("  por carpeta:", dict(Counter(str(a.parent.relative_to(RAIZ)) for a, _ in derivados)))
+  for a, b in derivados[::max(1, len(derivados) // 12)]: print(f"    {a.name} -> {b.name}")
   # CSV
   csvs = {"etiquetas.csv": "objeto", "revision_Moras.csv": "objeto", "revision_Pinas.csv": "objeto", "revision_cambios.csv": "objeto",
           "relacion_drive.csv": "local", "revision_2026-10-07/decisiones.csv": "objeto"}
-  def renombrar_ruta(ruta):
-    seg_, nombre = re.split(r"[\\/]", ruta, 1) if re.search(r"[\\/]", ruta) else ("", ruta)
+  def renombrar_ruta(ruta, recorte=True):
+    seg_, nombre = re.split(r"[\\/]", ruta, maxsplit=1) if re.search(r"[\\/]", ruta) else ("", ruta)
     seg = {"Moras": "Moras", "Pinas": "Pinas", "Bananos": "Bananos", "bananos": "Bananos"}.get(seg_, seg_)
-    nn = nuevo_nombre(seg, nombre, mapa, drive_stems)
+    nn = (recorte and final.get((seg, nombre))) or nuevo_nombre(seg, nombre, mapa, drive_stems, recorte=recorte)
     return ruta if not nn else ruta[:len(seg_) + 1] + nn
   for f, col in csvs.items():
     ruta = AQUI / "data" / f
     if not ruta.exists(): continue
     delim = "\t" if f.endswith("decisiones.csv") else ","
     enc = "utf-8-sig" if f == "relacion_drive.csv" else "utf-8"
+    es_recorte = f != "relacion_drive.csv"            # relacion_drive.csv lista fotos crudas, no recortes
     filas = list(csv.DictReader(open(ruta, encoding=enc), delimiter=delim))
-    n = sum(1 for r in filas if r[col] and renombrar_ruta(r[col]) != r[col])
+    n = sum(1 for r in filas if r[col] and renombrar_ruta(r[col], es_recorte) != r[col])
     print(f"  {f}: {n} filas cambian")
     if not args.dry:
       for r in filas:
-        if r[col]: r[col] = renombrar_ruta(r[col])
+        if r[col]: r[col] = renombrar_ruta(r[col], es_recorte)
       with open(ruta, "w", newline="", encoding=enc) as fh:
         w = csv.DictWriter(fh, fieldnames=filas[0].keys(), delimiter=delim); w.writeheader(); w.writerows(filas)
   if args.dry:

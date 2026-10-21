@@ -4,8 +4,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/frutas-mora%20%C2%B7%20pi%C3%B1a%20%C2%B7%20banano-6a3d9a?style=flat-square" alt="frutas">
-  <img src="https://img.shields.io/badge/fotos-2492-2e7d32?style=flat-square" alt="fotos">
-  <img src="https://img.shields.io/badge/recortes-5854-f9a825?style=flat-square" alt="recortes">
+  <img src="https://img.shields.io/badge/fotos-2417-2e7d32?style=flat-square" alt="fotos">
+  <img src="https://img.shields.io/badge/recortes-15657-f9a825?style=flat-square" alt="recortes">
   <img src="https://img.shields.io/badge/segmentaci%C3%B3n-SAM%203-1565c0?style=flat-square" alt="SAM 3">
   <img src="https://img.shields.io/badge/PyTorch-2.13-ee4c2c?style=flat-square" alt="PyTorch">
 </p>
@@ -28,38 +28,50 @@
 
 ## El dataset
 
-Estado al 17 de octubre de 2026. Un **recorte** es la imagen de un solo fruto sobre fondo blanco producida por SAM 3; de una foto salen uno o varios recortes. Los recortes **pendientes** ya están segmentados pero todavía no tienen etiqueta.
+Estado al 21 de octubre de 2026. Un **recorte** es la imagen de un solo fruto sobre fondo blanco producida por SAM 3; de una foto salen uno o varios recortes. Los recortes **pendientes** ya están segmentados pero todavía no tienen etiqueta.
 
-| Fruta | Fotos | Días de captura | Fotos sin segmentar | Recortes | Etiquetados | Pendientes |
+| Fruta | Fotos | Días de captura | Recortes | Etiquetados | Pendientes | Avance |
 |---|---:|---:|---:|---:|---:|---:|
-| Mora | 870 | 9 | 482 | 3 881 | 1 467 | 2 414 |
-| Piña | 787 | 7 | 268 | 1 159 | 494 | 665 |
-| Banano | 835 | 40 | 444 | 814 | 94 | 720 |
-| **Total** | **2 492** | | **1 194** | **5 854** | **2 055** | **3 799** |
+| Mora | 823 | 8 | 11 585 | 2 308 | 9 277 | 20 % |
+| Piña | 768 | 7 | 2 652 | 1 657 | 995 | 62 % |
+| Banano | 826 | 40 | 1 420 | 1 420 | 0 | 100 % |
+| **Total** | **2 417** | | **15 657** | **5 385** | **10 272** | **34 %** |
 
-Las *fotos sin segmentar* son de sesiones antiguas que todavía no se han pasado por SAM 3 (79 de las de mora son archivos dañados). El recuento completo, por sesión de captura, se genera en PDF con `recuento_pdf.py`.
+Todas las fotos están segmentadas; 88 no produjeron ningún recorte (17 archivos dañados, 37 con todas las detecciones descartadas por los filtros y 34 sin ninguna detección). El 21 de octubre de 2026 se retiraron 75 fotos repetidas (idénticas byte a byte a otra de la base) con sus 1 149 recortes; en Drive quedan aparte, en `duplicados_retirados/`. El recuento completo, por sesión de captura, se genera en PDF con `recuento_pdf.py`.
 
 Recortes etiquetados por clase:
 
 | Mora | | Piña | | Banano | |
 |---|---:|---|---:|---|---:|
-| Sana | 1 381 | Sana | 433 | Sano | 90 |
-| Antracnosis | 44 | Pudrición | 27 | Fusarium | 0 |
-| Moho gris | 32 | Daño externo (cortes, mordidas) | 15 | Phytophthora | 0 |
-| Botritis | 0 | Phytophthora | 8 | | |
-| Fusarium | 0 | Fusarium | 4 | | |
+| Sana | 2 062 | Sana | 642 | Sano | 854 |
+| Antracnosis | 45 | Pudrición | 97 | Trips | 34 |
+| Moho gris | 33 | Fusarium | 68 | Phytophthora | 12 |
+| Botritis | 14 | Daño externo (cortes, mordidas) | 29 | Fusarium | 0 |
+| Fusarium | 1 | Phytophthora | 22 | | |
 | | | Corte interno (no se entrena) | 6 | | |
-| Descartados (ilegibles) | 10 | Descartados | 1 | Descartados | 4 |
+| Descartados (ilegibles) | 153 | Descartados | 793 | Descartados | 520 |
 
-Las etiquetas están en [`Algorithm/codes/Dataset_codes/data/etiquetas.csv`](Algorithm/codes/Dataset_codes/data/etiquetas.csv) (columnas `objeto, fruta, clase`). El 7 de octubre de 2026 se revisaron una por una las clases de enfermedad y una muestra de las sanas, en láminas numeradas, cruzando cada etiqueta con la predicción de un modelo entrenado por validación cruzada; cambiaron 121 de 2 055 etiquetas ([`revision_cambios.csv`](Algorithm/codes/Dataset_codes/data/revision_cambios.csv)). Criterios de etiquetado acordados:
+Las etiquetas están en [`Algorithm/codes/Dataset_codes/data/etiquetas.csv`](Algorithm/codes/Dataset_codes/data/etiquetas.csv) (columnas `objeto, fruta, clase`). El 7 de octubre de 2026 se revisaron una por una las clases de enfermedad y una muestra de las sanas, en láminas numeradas, cruzando cada etiqueta con la predicción de un modelo entrenado por validación cruzada; cambiaron 121 de 2 055 etiquetas ([`revision_cambios.csv`](Algorithm/codes/Dataset_codes/data/revision_cambios.csv)). El 21 de octubre de 2026 se revisaron del mismo modo, con `revision_sesion.py`, los 2 317 recortes de la sesión de etiquetado del día anterior, y se descartaron 416 que mostraban solo hojas, corona, fondo o fragmentos ilegibles. Criterios de etiquetado acordados:
 
 - **Mora.** Drupas secas, pardas o momificadas → antracnosis. Cubierta gris o blanquecina, polvorienta → moho gris. Moras rojas o verdes inmaduras y "drupa blanca" por sol → sana.
 - **Piña.** Pudrición solo con tejido podrido visible, sin importar la madurez. Cortes, grietas y mordidas → daño externo, que es una clase aparte y no cuenta como enfermedad. Fotos de piña cortada por dentro → corte interno, que no se usa para entrenar.
-- **Banano.** Se segmenta por racimo (`"bunch of bananas"`); las fotos de bananos sueltos se segmentan por dedo (`"banana"`).
+- **Banano.** Se segmenta por racimo (`"bunch of bananas"`); las fotos de bananos sueltos se segmentan por dedo (`"banana"`). Clases: sano, trips (plaga), phytophthora y fusarium.
+- **Todas.** Recortes de solo hojas, corona, tallo o fondo, fragmentos delgados y recortes ilegibles → descartado.
 
 **Convención de nombres.** Fotos: `<Fruta>_<Mes>_<DD>_<N>`, con la fecha real de captura tomada del archivo original del celular (por ejemplo `Banan_Jun_10_25.jpg`). Recortes: `<foto>_<NN>.png` (por ejemplo `Banan_Jun_10_25_00.png`). Solo 11 fotos descargadas de Internet o WhatsApp, sin fecha, conservan su nombre original.
 
-**Descarga.** Las imágenes (≈ 21 GB) están en Google Drive: *enlace pendiente de publicación*.
+**Descarga.** Las imágenes están en Google Drive, en la carpeta [`ORGANIZACION BASE DE DATOS`](https://drive.google.com/drive/folders/1wzLPTt5SAcdei6OD2aFI09X8UzJqQ7CC) (acceso para el equipo del proyecto), organizadas así por `armar_drive.py`, que también sincroniza la copia existente:
+
+```
+ORGANIZACION BASE DE DATOS/
+├── LEEME.txt · etiquetas.csv · relacion_drive.csv · revision_cambios.csv
+├── Recuento_base_de_datos_<fecha>.pdf
+├── 1_fotos_originales/<Fruta>/                fotos completas
+├── 2_recortes_segmentados/<Fruta>/<clase>/    recortes según su etiqueta; sin_etiquetar/ = pendientes
+├── 3_descartes_segmentacion/<Fruta>/          detecciones rechazadas por los filtros
+├── duplicados_retirados/                      fotos repetidas retiradas y sus recortes (solo respaldo)
+└── versiones_anteriores/                      recuentos en PDF de fechas anteriores
+```
 
 ## Pipeline
 
@@ -78,13 +90,13 @@ flowchart LR
 1. **Cruce con Drive** (`relacion_drive.py`): empareja cada foto local con su original de Drive por contenido (MD5 y hash perceptual con las cuatro rotaciones), porque los nombres no coinciden. Detecta fotos que faltan, duplicadas y corruptas.
 2. **Incorporación** (`agregar_desde_drive.py`): copia lo que falta con el nombre y la fecha real de captura; `renombrar_fotos.py` aplica la misma convención a todo lo existente y propaga el cambio a recortes y CSV.
 3. **Segmentación** (`segmentar.py` + `Deteccion_y_filtrado/`): SAM 3 con prompts de texto por fruta, eliminación de detecciones duplicadas y anidadas, y filtros de forma, tamaño mínimo (120 px), oclusión y enfoque. Lo descartado se guarda con el motivo en el nombre.
-4. **Etiquetado** (`etiquetado_visual.py`): herramienta de teclado que muestra solo los recortes pendientes y guarda cada etiqueta al instante. `revisar_etiquetas.py` busca etiquetas dudosas por validación cruzada.
+4. **Etiquetado** (`etiquetado_visual.py`): herramienta de teclado que muestra solo los recortes pendientes de la fruta elegida, junto a la foto original con el recorte resaltado, avisa si un recorte se superpone con otro de la misma foto y guarda cada etiqueta al instante. `revision_sesion.py` arma láminas numeradas de una sesión para revisarla y descartar por número; `revisar_etiquetas.py` busca etiquetas dudosas por validación cruzada; `quitar_duplicados.py` retira fotos repetidas y sus recortes.
 5. **Dataset de entrenamiento** (`construir_dataset.py`): lo reconstruye desde `etiquetas.csv` con un mapa de clases y agrega copias aumentadas solo a las clases minoritarias.
 6. **Entrenamiento y evaluación** (`sota_networks/`): las ocho redes con el mismo protocolo, registro en Weights & Biases, medición de costo e informes.
 
 ## Estructura esperada del dataset
 
-Al descargar el dataset de Drive, sus dos carpetas de imágenes van en estas rutas del repositorio (los scripts las buscan ahí):
+Los scripts trabajan con las imágenes en estas rutas del repositorio. Desde la copia de Drive: el contenido de `1_fotos_originales/<Fruta>` va en `Algorithm/Our_dataset_sin_segmen/{Moras,Pinas,bananos}` y todos los recortes de `2_recortes_segmentados/<Fruta>/*/`, sin las subcarpetas de clase, en `dataset_segm/{Moras,Pinas,Bananos}` (la clase la da `etiquetas.csv`):
 
 ```
 mercoia/
@@ -132,7 +144,7 @@ La entrada es una imagen o una carpeta de **recortes** (fruto sobre fondo blanco
 python Algorithm/codes/Dataset_codes/relacion_drive.py         # qué falta
 python Algorithm/codes/Dataset_codes/agregar_desde_drive.py    # copiar y renombrar
 python Algorithm/codes/Dataset_codes/segmentar.py mora --gpu 0 # SAM 3 (mora | pina | banano)
-python Algorithm/codes/Dataset_codes/etiquetado_visual.py      # etiquetar lo pendiente
+python Algorithm/codes/Dataset_codes/etiquetado_visual.py --fruta pina   # etiquetar lo pendiente (mora | pina | banano)
 python Algorithm/codes/Dataset_codes/estado_dataset.py         # recuento en Excel
 python Algorithm/codes/Dataset_codes/recuento_pdf.py           # recuento en PDF (avance del proyecto)
 ```
@@ -264,7 +276,7 @@ La prueba con recortes no vistos usa las carpetas `inferencia/mora_test` y `infe
 ## Limitaciones
 
 - **Mora generaliza mal fuera de sus sesiones.** El 100 % interno de mora se obtuvo con un conjunto de prueba de las mismas sesiones de captura que el entrenamiento, en el que cada clase venía casi de una sola sesión; con recortes de otras fotos y etiquetas revisadas acierta 4 de 10. Hay que reentrenarlo con el dataset reconstruido desde `etiquetas.csv`.
-- **Pocas imágenes enfermas.** Hay 44 antracnosis y 32 moho gris en mora, 39 piñas enfermas y ningún banano enfermo etiquetado. Los conjuntos de prueba tienen de 4 a 8 imágenes enfermas, así que los intervalos de confianza son anchos (74/74 → [0.951, 1.000]).
+- **Pocas imágenes enfermas.** Los resultados de arriba se obtuvieron con el dataset de inicios de octubre (44 antracnosis y 32 moho gris en mora, 39 piñas enfermas). Los conjuntos de prueba tenían de 4 a 8 imágenes enfermas, así que los intervalos de confianza son anchos (74/74 → [0.951, 1.000]). El dataset actual tiene 93 moras, 216 piñas y 46 bananos afectados etiquetados: hay que reentrenar.
 - **Una sola semilla** y sin prueba en una sesión de captura independiente.
 - **Costo medido en GPU de escritorio**, no en el celular de destino.
 
@@ -283,11 +295,14 @@ mercoia/
 │       ├── segmentar.py                 # SAM 3 por fruta (--patron, --prompts)
 │       ├── Deteccion_y_filtrado/        # prompts y filtros de SAM 3 por fruta
 │       ├── etiquetado_visual.py         # herramienta de etiquetado por teclado
+│       ├── revision_sesion.py           # láminas numeradas para revisar una sesión de etiquetado
+│       ├── quitar_duplicados.py         # retira fotos repetidas y sus recortes
 │       ├── revisar_etiquetas.py         # etiquetas dudosas por validación cruzada
 │       ├── construir_dataset.py         # etiquetas.csv → dataset de entrenamiento
 │       ├── generar_augmentacion.py      # copias aumentadas en disco
 │       ├── estado_dataset.py            # recuento del dataset en Excel
 │       ├── recuento_pdf.py              # recuento del dataset en PDF, por fruta, clase y sesión
+│       ├── armar_drive.py               # copia organizada por fruta y clase para Google Drive
 │       └── data/                        # etiquetas.csv, relacion_drive.csv, revision_cambios.csv
 ├── sota_networks/
 │   ├── models.py                        # las 8 arquitecturas
@@ -307,12 +322,12 @@ mercoia/
 
 ## Cita y autoría
 
-Proyecto MERCOIA, Universidad Industrial de Santander. Autor: Jose Barrios.
+Proyecto MERCOIA, Universidad Industrial de Santander. Autor: Jose Alejandro Barrios Pico.
 
 ```bibtex
 @misc{mercoia2026,
   title  = {MERCOIA: dataset y banco de pruebas para el diagnóstico de enfermedades en mora, piña y banano a partir de imágenes RGB},
-  author = {Barrios, Jose},
+  author = {Barrios Pico, Jose Alejandro},
   year   = {2026},
   howpublished = {\url{https://github.com/Josebarr20/mercoia}}
 }

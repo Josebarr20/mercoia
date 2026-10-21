@@ -3,9 +3,10 @@
 Copia los recortes de dataset_segm/<Fruta> según la clase del CSV, aplicando el mapa de clases de abajo, y
 genera copias aug_* (generar_augmentacion.py, FACTOR por original) solo en las clases con menos de la mitad
 de imágenes que la mayoritaria, para compensar el desbalance en disco igual que en Algorithm/data.
-Por ahora solo piña, en binario: pina_sana / pina_enferma (pudrición, afectación externa, phytophthora, fusarium).
+Piña: pina_sana / pina_enferma (pudrición, phytophthora, fusarium) / pina_dano_externo.
+Banano: banano_sano / banano_afectado (trips, phytophthora, fusarium), decidido el 2026-10-20 por los pocos casos.
 
-Uso:  python construir_dataset.py [--salida data_etq] [--factor 5]
+Uso:  python construir_dataset.py [--salida data_etq] [--factor 5] [--frutas Bananos]   (por defecto todas las del MAPA)
 """
 import argparse
 import csv
@@ -21,6 +22,8 @@ MAPA = {  # carpeta de dataset_segm -> {clase en etiquetas.csv: clase de entrena
   # pina_dano_externo (cortes, mordidas) va como clase propia; pina_corte_interno y *_descartado no entrenan
   "Pinas": {"pina_sana": "pina_sana", "pina_pudricion": "pina_enferma", "pina_phytophthora": "pina_enferma",
             "pina_fusarium": "pina_enferma", "pina_dano_externo": "pina_dano_externo"},
+  "Bananos": {"banano_sano": "banano_sano", "banano_trips": "banano_afectado", "banano_phytophthora": "banano_afectado",
+              "banano_fusarium": "banano_afectado"},
 }
 
 
@@ -30,6 +33,8 @@ def main(args):
   salida = AQUI.parents[1] / args.salida
   filas = list(csv.DictReader(open(CSV, encoding="utf-8")))
   for fruta, mapa in MAPA.items():
+    if args.frutas and fruta not in args.frutas:
+      continue
     destinos = set(mapa.values())
     for c in destinos:                      # se reconstruye desde cero: la verdad es el CSV, no la carpeta
       shutil.rmtree(salida / c, ignore_errors=True); (salida / c).mkdir(parents=True)
@@ -54,4 +59,5 @@ if __name__ == "__main__":
   p = argparse.ArgumentParser()
   p.add_argument("--salida", default="data_etq", help="carpeta dentro de Algorithm/")
   p.add_argument("--factor", type=int, default=5)
+  p.add_argument("--frutas", nargs="+", choices=list(MAPA), help="reconstruir solo estas (las demás no se tocan)")
   main(p.parse_args())

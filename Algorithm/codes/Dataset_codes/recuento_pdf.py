@@ -26,13 +26,13 @@ IMG = {".png", ".jpg", ".jpeg"}
 MES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 MES_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
 NOMBRE = {"sana": "Sana", "sano": "Sano", "antracnosis": "Antracnosis", "moho_gris": "Moho gris",
-          "botritis": "Botritis (sin ejemplos tras la revisión)", "fusarium": "Fusarium", "pudricion": "Pudrición", "phytophthora": "Phytophthora",
-          "dano_externo": "Daño externo (cortes, mordidas)"}
+          "botritis": "Botritis", "fusarium": "Fusarium", "pudricion": "Pudrición", "phytophthora": "Phytophthora",
+          "dano_externo": "Daño externo (cortes, mordidas)", "trips": "Trips"}
 NO_CLASE = ("_descartado", "_corte_interno")       # etiquetados pero que no son una condición del fruto
 # Clases definidas en la herramienta de etiquetado (para mostrar también las que aún tienen 0)
 DEFINIDAS = {"Mora": ["sana", "antracnosis", "moho_gris", "botritis", "fusarium"],
              "Piña": ["sana", "pudricion", "phytophthora", "fusarium", "dano_externo"],
-             "Banano": ["sano", "fusarium", "phytophthora"]}
+             "Banano": ["sano", "fusarium", "phytophthora", "trips"]}
 # Paleta validada (slots 1 y 2 de la paleta de referencia) + neutros
 C_SANA, C_ENFERMA, C_DESC, C_PEND = "#2a78d6", "#eb6834", "#a3a29b", "#e4e3dd"
 
@@ -44,6 +44,9 @@ def sesion(stem, pref):
 
 def contar():
   etq = {r["objeto"]: r["clase"] for r in csv.DictReader(open(ETIQUETAS, encoding="utf-8"))}
+  rel = AQUI / "data" / "relacion_drive.csv"   # fotos que relacion_drive.py no pudo abrir (PNG truncados)
+  danadas = {Path(r["local"]).stem for r in csv.DictReader(open(rel, encoding="utf-8-sig"))
+             if r["metodo"] == "error_lectura"} if rel.exists() else set()
   datos = {}
   for fruta, crud, seg, pref in FRUTAS:
     fotos = [p for p in (CRUDAS / crud).iterdir() if p.suffix.lower() in IMG]
@@ -65,7 +68,9 @@ def contar():
     sin_segmentar = [p for p in sin_recorte if p.stem not in con_descarte]   # nunca pasaron por SAM 3 (o sin detecciones)
     datos[fruta] = {"fotos": len(fotos), "recortes": len(recs), "clases": clases, "sesiones": ses,
                     "pendientes": sum(1 for p in recs if f"{seg}/{p.name}" not in etq),
-                    "sin_segmentar": len(sin_segmentar), "filtradas": len(sin_recorte) - len(sin_segmentar)}
+                    "sin_segmentar": len(sin_segmentar), "filtradas": len(sin_recorte) - len(sin_segmentar),
+                    "sin_recorte": len(sin_recorte), "sin_deteccion": sin_segmentar,
+                    "danadas_sin_segmentar": sum(1 for p in sin_segmentar if p.stem in danadas)}
   return datos
 
 
@@ -108,7 +113,7 @@ def esc(n):
 def latex(datos, fig, hoy):
   tot = {k: sum(d[k] for d in datos.values()) for k in ("fotos", "recortes", "pendientes")}
   etiq = tot["recortes"] - tot["pendientes"]
-  L = [r"""\documentclass[11pt,a4paper]{article}
+  L = [r"""\documentclass[11pt,letterpaper]{article}
 \usepackage[T1]{fontenc}\usepackage{lmodern}\usepackage[spanish,es-tabla,es-nodecimaldot]{babel}
 \usepackage[margin=2.3cm]{geometry}\usepackage{booktabs,longtable,graphicx,float,caption,xcolor}
 \captionsetup{font=small,labelfont=bf}\setlength{\parskip}{4pt}
@@ -126,11 +131,11 @@ Un recorte \emph{pendiente} ya está segmentado pero todavía no tiene etiqueta.
        r"\section*{1. Imágenes por fruta}",
        r"\begin{table}[H]\centering\caption{Fotos, recortes y avance del etiquetado por fruta.}",
        r"\begin{tabular}{lrrrrrrr}\toprule",
-       r"Fruta & Fotos & \shortstack{Días de\\captura} & \shortstack{Fotos sin\\segmentar} & Recortes & Etiquetados & Pendientes & Avance \\\midrule"]
-  sin_seg = sum(d["sin_segmentar"] for d in datos.values())
+       r"Fruta & Fotos & \shortstack{Días de\\captura} & \shortstack{Fotos sin\\recortes} & Recortes & Etiquetados & Pendientes & Avance \\\midrule"]
+  sin_seg = sum(d["sin_recorte"] for d in datos.values())
   for fr, d in datos.items():
     e = d["recortes"] - d["pendientes"]; n_ses = len([k for k in d["sesiones"] if k is not None])
-    L.append(f"{fr} & {esc(d['fotos'])} & {n_ses} & {esc(d['sin_segmentar'])} & {esc(d['recortes'])} & {esc(e)} & {esc(d['pendientes'])} & {100 * e / d['recortes']:.0f}\\,\\% \\\\")
+    L.append(f"{fr} & {esc(d['fotos'])} & {n_ses} & {esc(d['sin_recorte'])} & {esc(d['recortes'])} & {esc(e)} & {esc(d['pendientes'])} & {100 * e / d['recortes']:.0f}\\,\\% \\\\")
   L += [r"\midrule", f"\\textbf{{Total}} & \\textbf{{{esc(tot['fotos'])}}} & & \\textbf{{{esc(sin_seg)}}} & \\textbf{{{esc(tot['recortes'])}}} & \\textbf{{{esc(etiq)}}} & "
         f"\\textbf{{{esc(tot['pendientes'])}}} & \\textbf{{{100 * etiq / tot['recortes']:.0f}\\,\\%}} \\\\",
         r"\bottomrule\end{tabular}\end{table}",
@@ -149,22 +154,26 @@ Un recorte \emph{pendiente} ya está segmentado pero todavía no tiene etiqueta.
   L += [r"\end{tabular}\end{table}",
         r"\noindent\textbf{Criterios de etiquetado.} Mora: drupas secas, pardas o momificadas, antracnosis; cubierta gris o blanquecina, "
         r"moho gris; moras rojas o verdes inmaduras y drupas blancas por sol, sana. Piña: pudrición solo con tejido podrido visible; "
-        r"cortes y mordidas son daño externo, que no cuenta como enfermedad. Las etiquetas se revisaron una por una el 7 de octubre de 2026.",
+        r"cortes y mordidas son daño externo, que no cuenta como enfermedad. Las etiquetas se revisaron una por una el 7 y el 21 de octubre de 2026; en la segunda revisión se descartaron los recortes ilegibles o que mostraban solo hojas, corona o fondo, y se retiraron de la base 75 fotos repetidas con sus recortes.",
         r"\section*{3. Lo que falta}"]
   enf = {fr: sum(v for k, v in d["clases"].items() if k not in ("sana", "sano", "descartado", "corte_interno")) for fr, d in datos.items()}
-  rel = AQUI / "data" / "relacion_drive.csv"   # fotos que relacion_drive.py no pudo abrir (PNG truncados)
-  nom = {"mora": "Mora", "pina": "Piña", "banano": "Banano"}
-  danadas = Counter(nom[r["fruta"]] for r in csv.DictReader(open(rel, encoding="utf-8-sig")) if r["metodo"] == "error_lectura") if rel.exists() else {}
+  danadas = {fr: d["danadas_sin_segmentar"] for fr, d in datos.items()}
   L.append(r"\begin{itemize}")
   for fr, d in datos.items():
     top = sorted(((k, v) for k, v in d["sesiones"].items() if v["pendientes"]), key=lambda x: -x[1]["pendientes"])[:3]
     L.append(f"\\item \\textbf{{{fr}:}} {esc(d['pendientes'])} recortes por etiquetar"
              + (", sobre todo de " + ", ".join(f"{fecha_txt(k)} ({esc(v['pendientes'])})" for k, v in top) if top else "")
-             + f". {esc(d['sin_segmentar'])} fotos de sesiones antiguas todavía no se han segmentado con SAM~3"
-             + (f" ({danadas[fr]} de ellas son archivos dañados que no se pueden abrir)" if danadas.get(fr) else "")
-             + (f", y en {d['filtradas']} los filtros descartaron todas las detecciones (frutos muy pequeños o tapados)" if d["filtradas"] else "")
+             + f". Todas las fotos pasaron por SAM~3; {esc(d['sin_recorte'])} no dieron ningún recorte"
+             + ": " + ", ".join(x for x in (
+                 f"{danadas[fr]} son archivos dañados que no se pueden abrir" if danadas.get(fr) else "",
+                 f"en {d['filtradas']} los filtros descartaron todas las detecciones (frutos muy pequeños o tapados)" if d["filtradas"] else "",
+                 f"{len(d['sin_deteccion']) - danadas.get(fr, 0)} no tuvieron ninguna detección" if len(d["sin_deteccion"]) - danadas.get(fr, 0) else "") if x)
              + f". Hay {enf[fr]} recortes etiquetados con alguna enfermedad o daño.")
-  L += [r"\item \textbf{Enfermedades.} Las clases de enfermedad siguen siendo minoritarias en las tres frutas, y banano todavía no tiene ningún racimo enfermo etiquetado. Etiquetar los recortes pendientes es la prioridad para equilibrar el dataset.",
+  sin_enf = [fr for fr in datos if not enf[fr]]
+  L += [r"\item \textbf{Enfermedades.} Las clases de enfermedad siguen siendo minoritarias en las tres frutas"
+        + (f", y {' y '.join(f.lower() for f in sin_enf)} todavía no tiene ningún fruto enfermo etiquetado" if sin_enf else
+           " (" + ", ".join(f"{fr.lower()} {enf[fr]} de {datos[fr]['recortes'] - datos[fr]['pendientes']} etiquetados" for fr in datos) + ")")
+        + ". Etiquetar más frutos enfermos es la prioridad para equilibrar el dataset.",
         r"\end{itemize}",
         r"\section*{Anexo. Detalle por sesión de captura}",
         r"\noindent Sesión = día de captura, tomado de la fecha original de cada foto. Sanas, enfermas y descartadas son recortes ya etiquetados; las enfermas incluyen el daño externo de piña."]
