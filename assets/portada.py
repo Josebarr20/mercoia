@@ -19,6 +19,11 @@ GRANDE = {
   "O": ["0111110", "1111111", "1100011", "1100011", "1100011", "1100011", "1100011", "1111111", "0111110"],
   "I": ["1111111", "1111111", "0011100", "0011100", "0011100", "0011100", "0011100", "1111111", "1111111"],
   "A": ["0011100", "0111110", "1110111", "1100011", "1100011", "1111111", "1111111", "1100011", "1100011"],
+  # minúsculas: altura de x de 7 filas, apoyadas en la misma línea base que las mayúsculas
+  "e": ["0000000", "0000000", "0111110", "1111111", "1100011", "1111111", "1100000", "1111111", "0111111"],
+  "r": ["0000000", "0000000", "1101110", "1111111", "1110011", "1100000", "1100000", "1100000", "1100000"],
+  "c": ["0000000", "0000000", "0111110", "1111111", "1100011", "1100000", "1100011", "1111111", "0111110"],
+  "o": ["0000000", "0000000", "0111110", "1111111", "1100011", "1100011", "1100011", "1111111", "0111110"],
 }
 # Fuente 5x7 para el subtítulo
 CHICA = {
@@ -129,22 +134,41 @@ MORA = ["...g.g...", "..gGgGg..", "...gGg...", "..pPpPp..", ".pPwPpPp.", ".PpPpP
 PAL_MORA = {"g": (40, 120, 50), "G": (110, 190, 80), "p": (60, 16, 80), "P": (120, 44, 140), "w": (210, 150, 230)}
 PINA = ["...g.G.g...", "..gGgGgGg..", "...gGgGg...", "....gGg....", "..yYyYyYy..", ".yYoYoYoYy.", ".YoYwYoYoY.", ".yYoYoYoYy.", ".YoYoYoYwY.", ".yYoYoYoYy.", ".YoYoYoYoY.", "..yYoYoYy..", "...yyyyy..."]
 PAL_PINA = {"g": (40, 120, 50), "G": (110, 190, 80), "y": (196, 132, 28), "Y": (250, 200, 60), "o": (160, 92, 28), "w": (255, 240, 170)}
-BANANO = ["............kk", "...........yYk", "..........yYYy", ".........yYYyd", "......yyYYYyd.", "...yyYYYYyyd..", "yyYYYYYyydd...", "dyyyyyydd.....", ".ddddd........"]
-PAL_BANANO = {"k": (96, 64, 30), "y": (226, 176, 36), "Y": (255, 230, 90), "d": (190, 126, 24)}
+DEDO = ["............kk", "...........gGk", "..........gGGg", ".........gGGgd", "......ggGGGgd.", "...ggGGGGggd..",
+        "tgGGGGGggdd...", "tggggggdd.....", ".ddddd........"]               # un banano: punta oscura a la izquierda, tallo arriba
+PAL_RACIMO = {"G": (176, 226, 108), "g": (98, 176, 66), "d": (44, 112, 48), "k": (110, 82, 42), "t": (64, 48, 30),
+              "o": CONTORNO}
+
+
+def racimo():
+  """Mano de tres bananos verdes apilados que salen del mismo tallo; cada uno con su contorno para que se separen."""
+  dedos = [(4, 0), (2, 4), (0, 8)]                    # de atrás hacia adelante
+  g = [["."] * 19 for _ in range(17)]
+  for ox, oy in dedos:
+    celdas = {(x + ox, y + oy): ch for y, fila in enumerate(DEDO) for x, ch in enumerate(fila) if ch != "."}
+    for (x, y) in celdas:                             # contorno propio: tapa el banano de atrás
+      for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        q = (x + dx, y + dy)
+        if q not in celdas and 0 <= q[0] < 19 and 0 <= q[1] < 17 and g[q[1]][q[0]] != ".":
+          g[q[1]][q[0]] = "o"
+    for (x, y), ch in celdas.items():
+      g[y][x] = ch
+  for x, y in [(17, 0), (18, 0), (17, 1), (17, 2), (16, 3), (16, 4), (17, 3)]:   # tallo que une los dedos
+    g[y][x] = "k"
+  return ["".join(f) for f in g]
 
 
 def main():
   img = Image.new("RGB", (W, H))
   fondo(img)
-  texto_grande(img, "MERCOIA", None, 22, esc=3, sep=3)
+  texto_grande(img, "MercoIA", None, 22, esc=3, sep=3)
   texto_chico(img, "MORA · PIÑA · BANANO", 55, (255, 240, 200))
-  # frutas sobre el pasto (base en y≈93), a la izquierda y a la derecha del título
-  sprite(img, 18, 73, MORA, PAL_MORA)
-  sprite(img, 44, 67, PINA, PAL_PINA)
-  sprite(img, 74, 75, BANANO, PAL_BANANO)
-  sprite(img, 218, 75, [f[::-1] for f in BANANO], PAL_BANANO)   # espejo
-  sprite(img, 252, 67, PINA, PAL_PINA)
-  sprite(img, 282, 73, MORA, PAL_MORA)
+  # frutas sobre el pasto (base en y≈93), a la izquierda del título y en espejo a la derecha
+  rac = racimo()
+  izquierda = [(6, 73, MORA, PAL_MORA), (28, 67, PINA, PAL_PINA), (54, 94 - 2 * len(rac), rac, PAL_RACIMO)]
+  for x, y, filas, pal in izquierda:
+    sprite(img, x, y, filas, pal)
+    sprite(img, W - x - 2 * len(filas[0]), y, [f[::-1] for f in filas], pal)
   img.resize((W * ESCALA, H * ESCALA), Image.NEAREST).save(SALIDA)
   print("portada:", SALIDA)
 
